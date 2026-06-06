@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - Správa požadavků</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+</head>
+<body class="bg-light">
+    <div class="container-fluid mt-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2>🛡️ Admin Panel – Požadavky zaměstnanců</h2>
+            <div>
+                <span class="badge bg-secondary p-2 me-2">Přihlášen jako: {{ current_user.realne_jmeno }}</span>
+                <a href="/logout" class="btn btn-danger btn-sm">Odhlásit se</a>
+            </div>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category if category != 'error' else 'danger' }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="card shadow">
+            <div class="card-header bg-dark text-white">
+                <h5 class="mb-0">Čekající požadavky k vyřízení (Zapište do Google Tabulky a potvrďte)</h5>
+            </div>
+            <div class="card-body p-0">
+                {% if pozadavky %}
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover align-middle mb-0">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Zaměstnanec</th>
+                                    <th>Pozice</th>
+                                    <th>Datum požadavku</th>
+                                    <th>Typ</th>
+                                    <th>Poznámka od zaměstnance</th>
+                                    <th class="text-center" style="width: 240px;">Akce</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for pozadavek in pozadavky %}
+                                    <tr>
+                                        <td><strong>{{ pozadavek.jmeno }}</strong></td>
+                                        <td>
+                                            {% if pozadavek.pozice == 'MANAGER' %}
+                                                <span class="badge bg-danger">{{ pozadavek.pozice }}</span>
+                                            {% elif pozadavek.pozice == 'PIT_BOSS' %}
+                                                <span class="badge bg-warning text-dark">{{ pozadavek.pozice }}</span>
+                                            {% else %}
+                                                <span class="badge bg-info text-dark">{{ pozadavek.pozice }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ pozadavek.datum.strftime('%d. %m. %Y') }}</td>
+                                        <td>
+                                            {% if pozadavek.typ_pozadavku == 'WDO' %}
+                                                <span class="badge bg-success">WDO</span>
+                                            {% else %}
+                                                <span class="badge bg-primary">{{ pozadavek.typ_pozadavku }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-muted"><em>{{ pozadavek.poznamka or 'Bez poznámky' }}</em></td>
+                                        <td class="text-center">
+                                            <div class="d-flex gap-2">
+                                                
+                                                <form action="/admin-vyridit-pozadavek" method="POST" class="w-50">
+                                                    <input type="hidden" name="pozadavek_id" value="{{ pozadavek.id }}">
+                                                    <input type="hidden" name="akce" value="schvalit">
+                                                    <button type="submit" class="btn btn-success btn-sm w-100">✔ Schválit</button>
+                                                </form>
+
+                                                <button type="button" class="btn btn-danger btn-sm w-50" data-bs-toggle="modal" data-bs-target="#modalOdmitnout-{{ pozadavek.id }}">
+                                                    ✖ Odmítnout
+                                                </button>
+
+                                            </div>
+
+                                            <div class="modal fade" id="modalOdmitnout-{{ pozadavek.id }}" tabindex="-1" aria-hidden="true">
+                                                <div class="modal-dialog modal-dialog-centered">
+                                                    <div class="modal-content">
+                                                        <form action="/admin-vyridit-pozadavek" method="POST">
+                                                            <input type="hidden" name="pozadavek_id" value="{{ pozadavek.id }}">
+                                                            <input type="hidden" name="akce" value="odmitnout">
+                                                            
+                                                            <div class="modal-header">
+                                                                <h5 class="modal-title text-dark">Odmítnutí požadavku — {{ pozadavek.jmeno }}</h5>
+                                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                            </div>
+                                                            <div class="modal-body text-dark text-start">
+                                                                <div class="mb-3">
+                                                                    <label class="form-label fw-semibold">Uveďte důvod zamítnutí (zobrazí se zaměstnanci):</label>
+                                                                    <textarea class="form-control" name="admin_poznamka" rows="3" placeholder="Např. Stop stav, plná kapacita dovolených, nedostatek lidí na směně..." required></textarea>
+                                                                </div>
+                                                            </div>
+                                                            <div class="modal-footer">
+                                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Zrušit</button>
+                                                                <button type="submit" class="btn btn-danger">Potvrdit a zamítnout</button>
+                                                            </div>
+                                                        </form>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="p-4 text-center text-muted">
+                        <h5>🎉 Žádné čekající požadavky. Vše je vyřízeno!</h5>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

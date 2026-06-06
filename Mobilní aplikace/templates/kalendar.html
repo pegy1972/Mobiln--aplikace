@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Můj kalendář</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+
+    <style>
+    /* Styl pro zvýraznění aktuálního dne */
+    .aktualni-den {
+        background-color: #e0f7fa !important; /* Jemná, světlá modrozelená */
+        border: 2px solid #00bcd4 !important; /* Výraznější tyrkysové ohraničení */
+        box-shadow: inset 0 0 8px rgba(0, 188, 212, 0.2);
+        position: relative;
+    }
+    
+    /* Malý decentní nápis "Dnes" do rohu buňky */
+    .aktualni-den::before {
+        content: "Dnes";
+        position: absolute;
+        top: 2px;
+        right: 8px;
+        font-size: 0.65rem;
+        color: #00838f;
+        font-weight: bold;
+        text-transform: uppercase;
+        z-index: 10;
+    }
+    </style>
+</head>
+<body class="bg-light">
+
+    <div class="container mt-3">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category if category != 'error' else 'danger' }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+    </div>
+
+    <div class="container mt-4" style="max-width: 600px;">
+        
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h4>📅 Osobní kalendář: {{ current_user.realne_jmeno }}</h4>
+            <a href="/zmena-hesla" class="btn btn-outline-secondary btn-sm me-2">🔑 Změnit heslo</a>
+            <a href="/logout" class="btn btn-outline-danger btn-sm">Odhlásit</a>
+        </div>
+        
+        <div class="card mb-3 shadow-sm">
+            <div class="card-body p-3">
+                <form method="GET" action="/muj-kalendar" id="monthForm">
+                    <label class="form-label small text-muted fw-bold mb-1">Zvolit měsíc pro prohlížení/plánování:</label>
+                    <select name="mesic" class="form-select form-select-lg" onchange="document.getElementById('monthForm').submit()">
+                        {% for m in mesice %}
+                            <option value="{{ m }}" {% if m == mesic %}selected{% endif %}>{{ m }}</option>
+                        {% endfor %}
+                    </select>
+                </form>
+            </div>
+        </div>
+
+        <h5 class="mb-2">Rozpis na měsíc: <span class="text-primary">{{ mesic }}</span></h5>
+        <div class="list-group shadow-sm mb-5" style="max-height: 400px; overflow-y: auto;">
+            {% if smeny %}
+                {% for s in smeny %}
+                    <div class="list-group-item d-flex justify-content-between align-items-center py-3 {% if s.den|int == dnes_den|int and mesic == dnes_mesic_jmeno %}aktualni-den{% endif %}">
+                        <div>
+                            <strong class="text-secondary">{{ s.den }}.</strong> <span class="fw-semibold">{{ s.den_v_tydnu }}</span>
+                            
+                            {% if s.smena|upper not in ['X', 'H', 'S','WDO'] %}
+                                <div class="small mt-1">
+                                    {% if s.mozna_dovolena|int > 0 %}
+                                            <button type="button" class="btn btn-link p-0 text-start text-decoration-none text-success" data-bs-toggle="modal" data-bs-target="#modalDovolena-{{ s.den }}">
+                                                    🟢 Možnost dovolené: <strong>{{ s.mozna_dovolena }}x</strong> (Chci zažádat)
+                                            </button>
+                                    {% elif s.mozna_dovolena|int == 0 %}
+                                            <span class="text-danger">🔴 Dovolená obsazena (0 míst)</span>
+                                    {% else %}
+                                            <span class="text-danger">🛑 Stop stav ({{ s.mozna_dovolena }})</span>
+                                    {% endif %}
+                                </div>
+
+                                {% if s.mozna_dovolena|int > 0 %}
+                                <div class="modal fade" id="modalDovolena-{{ s.den }}" tabindex="-1" aria-hidden="true">
+                                    <div class="modal-dialog modal-dialog-centered">
+                                        <div class="modal-content">
+                                            <form action="/novy-pozadavek" method="POST">
+                                                <input type="hidden" name="datum" value="{{ s.datum }}">
+                                                <input type="hidden" name="mesic" value="{{ mesic }}">
+                                                <input type="hidden" name="radek" value="{{ s.radek }}">
+                                                <input type="hidden" name="sloupec" value="{{ s.sloupec }}">
+                                                <input type="hidden" name="typ_pozadavku" value="Dovolená">
+                                                
+                                                <div class="modal-header">
+                                                    <h5 class="modal-title">Žádost o Dovolenou — {{ s.den }}. {{ mesic }}</h5>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                </div>
+
+                                                <div class="modal-body text-dark text-start">
+                                                    <div class="mb-3">
+                                                        <label class="form-label fw-semibold">Poznámka / Upřesnění (nepovinné):</label>
+                                                        <textarea class="form-control" name="poznamka" rows="2" placeholder="Např. Rodinné důvody, lékař atd..."></textarea>
+                                                    </div>
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Zavřít</button>
+                                                    <button type="submit" class="btn btn-success">Odeslat požadavek</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endif %}
+                            {% endif %}
+
+                            {% if s.smena|upper == 'X' and 'wdo' in s.wdo_potreba|lower %}
+                                <div class="small mt-1">
+                                    {% if s.wdo_pocet|int > 0 %}
+                                        <button type="button" class="btn btn-link p-0 text-start text-decoration-none text-warning" data-bs-toggle="modal" data-bs-target="#modalWdo-{{ s.den }}">
+                                            🟡 Volno? Možnost extra směny (WDO): Chybí <strong>{{ s.wdo_pocet }}x</strong>!
+                                        </button>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+                        </div>
+                        
+                        {% if s.wdo_pocet|int > 0 %}
+                        <div class="modal fade" id="modalWdo-{{ s.den }}" tabindex="-1" aria-hidden="true">
+                            <div class="modal-dialog modal-dialog-centered">
+                                <div class="modal-content">
+                                    <form action="/novy-pozadavek" method="POST">
+                                        <input type="hidden" name="datum" value="{{ s.datum }}">
+                                        <input type="hidden" name="mesic" value="{{ mesic }}">
+                                        <input type="hidden" name="radek" value="{{ s.radek }}">
+                                        <input type="hidden" name="sloupec" value="{{ s.sloupec }}">
+                                        <input type="hidden" name="typ_pozadavku" value="WDO">
+                                        
+                                        <div class="modal-header">
+                                            <h5 class="modal-title">Mám zájem o WDO — {{ s.den }}. {{ mesic }}</h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                        </div>
+                                        <div class="modal-body text-dark text-start">
+                                            <div class="mb-3">
+                                                <label class="form-label fw-semibold">Poznámka / Upřesnění (nepovinné):</label>
+                                                <textarea class="form-control" name="poznamka" rows="2" placeholder="Např. Můžu odpolední i noční..."></textarea>
+                                            </div>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Zrušit</button>
+                                            <button type="submit" class="btn btn-warning">Potvrdit zájem</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <div>
+                            {% if s.smena == 'X' or s.smena == 'x' %}
+                                <span class="badge bg-secondary px-3 py-2">Volno (X)</span>
+                            {% elif s.smena|upper == 'H' %}
+                                <span class="badge bg-danger px-3 py-2">{{ s.smena }}</span>    
+                            {% elif s.smena == 'Předpoklad směny' %}
+                                <span class="badge bg-light text-primary border border-primary px-3 py-2">ℹ️ Předpoklad směny</span>
+                            {% elif 'wdo' in s.smena.lower() %}
+                                <span class="badge bg-warning text-dark px-3 py-2">{{ s.smena }}</span>
+                            {% else %}  <span class="badge bg-primary px-3 py-2">{{ s.smena }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <div class="list-group-item text-center text-muted">Pro tento měsíc nemáš v tabulce zadané žádné směny.</div>
+            {% endif %}
+        </div>
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-white fw-bold">
+                📋 Stav mých požadavků (dovolené / WDO)
+            </div>
+            <div class="list-group list-group-flush">
+                {% if pozadavky %}
+                    {% for p in pozadavky %}
+                        <div class="list-group-item p-3">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <span class="badge bg-light text-dark border mb-1">{{ p.typ_pozadavku }}</span>
+                                    <div class="fw-bold text-dark">{{ p.datum.strftime('%d.%m.%Y') }}</div>
+                                    {% if p.poznamka %}
+                                        <small class="text-muted d-block mt-1">Moje poznámka: {{ p.poznamka }}</small>
+                                    {% endif %}
+                                    
+                                    {% if p.stav == 'zamitnuto' and p.admin_poznamka %}
+                                        <div class="mt-2 p-2 bg-danger-subtle text-danger rounded small border border-danger-subtle">
+                                            <strong>Důvod zamítnutí:</strong> {{ p.admin_poznamka }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                <div>
+                                    {% if p.stav == 'schvaleno' %}
+                                        <span class="badge bg-success p-2">✔ Schváleno</span>
+                                    {% elif p.stav == 'zamitnuto' %}
+                                        <span class="badge bg-danger p-2">❌ Zamítnuto</span>
+                                    {% else %}
+                                        <span class="badge bg-warning text-dark p-2">⏳ Čeká na vyřízení</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="p-3 text-center text-muted small">Zatím jsi neposlal(a) žádné požadavky.</div>
+                {% endif %}
+            </div>
+
+            {% if current_user.role == 'MANAGER' %}
+            <div class="row g-3 mb-4 mt-2">
+                <div class="col-12">
+                    <h5 class="fw-bold text-dark mb-1">📊 Přehled na dnešní den ({{ dnes_den }}. {{ dnes_mesic_jmeno|capitalize }})</h5>
+                    <p class="text-muted small mb-0">Aktuální obsazení směn vygenerované přímo z Google Tabulky.</p>
+                </div>
+                
+                <div class="col-md-6">
+                    <div class="card shadow-sm border-success h-100">
+                        <div class="card-header bg-success text-white fw-bold d-flex justify-content-between align-items-center">
+                            <span>🟢 V PRÁCI</span>
+                            <span class="badge bg-light text-success">{{ v_praci_dnes|length }}</span>
+                        </div>
+                        <div class="list-group list-group-flush">
+                            {% if v_praci_dnes %}
+                                {% for z in v_praci_dnes %}
+                                    <div class="list-group-item d-flex justify-content-between align-items-center py-2">
+                                        <span class="fw-medium text-dark">{{ z.jmeno }}</span>
+                                        <span class="badge {% if 'wdo' in z.kod or 'wd1' in z.kod or 'wd2' in z.kod or 'wd3' in z.kod or 'wd4' in z.kod or 'wd5' in z.kod %}bg-dark text-warning{% else %}bg-success-subtle text-success border border-success{% endif %} px-3 py-2">
+                                            {{ z.kod }}
+                                        </span>
+                                    </div>
+                                {% endfor %}
+                            {% else %}
+                                <div class="p-3 text-center text-muted small">Podle tabulky dnes nikdo nepracuje.</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="card shadow-sm border-danger h-100">
+                        <div class="card-header bg-danger text-white fw-bold d-flex justify-content-between align-items-center">
+                            <span>🏖️ DOVOLENÁ / VOLNO</span>
+                            <span class="badge bg-light text-danger">{{ na_dovolene_dnes|length }}</span>
+                        </div>
+                        <div class="list-group list-group-flush">
+                            {% if na_dovolene_dnes %}
+                                {% for z in na_dovolene_dnes %}
+                                    <div class="list-group-item d-flex justify-content-between align-items-center py-2">
+                                        <span class="text-secondary">{{ z.jmeno }}</span>
+                                        <span class="badge bg-danger-subtle text-danger border border-danger px-3 py-2">
+                                            {{ z.kod }}
+                                        </span>
+                                    </div>
+                                {% endfor %}
+                            {% else %}
+                                <div class="p-3 text-center text-muted small">Dnes nikdo nečerpá dovolenou.</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if current_user.role == 'PIT BOSS' %}
+            <div class="card shadow border-primary mb-5 mt-4">
+                <div class="card-header bg-primary text-white fw-bold d-flex justify-content-between align-items-center">
+                    <span>🔑 Správa požadavků zaměstnanců (ADMIN)</span>
+                    <span class="badge bg-light text-primary">Čeká: {{ ostatni_pozadavky|length }}</span>
+                </div>
+                <div class="list-group list-group-flush" style="max-height: 450px; overflow-y: auto;">
+                    {% if ostatni_pozadavky %}
+                        {% for p in ostatni_pozadavky %}
+                            <div class="list-group-item p-3">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <h6 class="mb-1 fw-bold text-dark">👤 {{ p.jmeno }}</h6>
+                                        
+                                        <span class="badge {% if p.typ_pozadavku == 'Dovolená' %}bg-danger{% else %}bg-warning text-dark{% endif %} mb-1">
+                                            {{ p.typ_pozadavku }}
+                                        </span>
+                                        
+                                        <div class="fw-bold text-secondary small">
+                                            Datum: {{ p.datum.strftime('%d.%m.%Y') if p.datum.strftime else p.datum }}
+                                        </div>
+                                        
+                                        {% if p.poznamka %}
+                                            <small class="text-muted d-block mt-1">Poznámka: {{ p.poznamka }}</small>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <div class="text-end">
+                                        <div class="btn-group btn-group-sm">
+                                            <form action="/admin-vyridit-pozadavek" method="POST" class="d-inline me-1">
+                                                <input type="hidden" name="pozadavek_id" value="{{ p.id }}">
+                                                <input type="hidden" name="akce" value="schvalit">
+                                                <button type="submit" class="btn btn-success btn-sm">✔ Schválit</button>
+                                            </form>
+                                            
+                                            <button type="button" class="btn btn-danger btn-sm" data-bs-toggle="collapse" data-bs-target="#collapseZamitnout-{{ p.id }}">
+                                                ❌ Zamítnout
+                                            </button>
+                                        </div>
+                                        
+                                        <div class="collapse mt-2" id="collapseZamitnout-{{ p.id }}">
+                                            <form action="/admin-vyridit-pozadavek" method="POST">
+                                                <input type="hidden" name="pozadavek_id" value="{{ p.id }}">
+                                                <input type="hidden" name="akce" value="odmitnout">
+                                                <input type="text" name="admin_poznamka" class="form-control form-control-sm mb-1" placeholder="Napište důvod zamítnutí..." required>
+                                                <button type="submit" class="btn btn-dark btn-sm w-100">Potvrdit zamítnutí</button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="p-4 text-center text-muted small">Žádné nevyřízené požadavky od ostatních zaměstnanců.</div>
+                    {% endif %}
+                </div>
+            </div>
+        {% endif %}
+        </div>
+
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        setInterval(function() {
+            const aktivniPrvek = document.activeElement.tagName;
+            if (aktivniPrvek !== 'TEXTAREA' && aktivniPrvek !== 'INPUT') {
+                console.log("Aktualizuji kalendář pro načtení nových změn od admina...");
+                location.reload();
+            }
+        }, 60000);
+    </script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const dnesniBunka = document.querySelector('.aktualni-den');
+            if (dnesniBunka) {
+                setTimeout(() => {
+                    dnesniBunka.scrollIntoView({ 
+                        behavior: 'smooth', 
+                        block: 'center'     
+                    });
+                }, 200);
+            }
+        });
+    </script>
+</body>
+</html>

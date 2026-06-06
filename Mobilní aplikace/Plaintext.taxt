@@ -1,0 +1,11 @@
+Mobilní Aplikace/
+├── app.py
+├── models.py
+├── google_sheets.py
+├── credentials.json     # Váš stažený klíč k Google API
+├── init_db.py           # Tento soubor teď vytvoříme pro spuštění databáze
+└── templates/
+    ├── login.html
+    ├── kalendar.html
+    ├── novy_pozadavek.html
+    └── admin.html

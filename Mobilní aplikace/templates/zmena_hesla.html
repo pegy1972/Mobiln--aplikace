@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Změna hesla</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+    <div class="container mt-5" style="max-width: 450px;">
+        
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="card shadow">
+            <div class="card-header bg-dark text-white fw-bold text-center py-3">
+                🔒 Změna hesla pro: {{ current_user.uzivatelske_jmeno }}
+            </div>
+            <div class="card-body p-4">
+                <form action="/zmena-hesla" method="POST">
+                    
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-secondary">Současné heslo</label>
+                        <input type="password" name="stare_heslo" class="form-control" required>
+                    </div>
+                    
+                    <hr>
+                    
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-secondary">Nové heslo</label>
+                        <input type="password" name="nove_heslo" class="form-control" required placeholder="Minimálně 6 znaků">
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="form-label small fw-bold text-secondary">Potvrzení nového hesla</label>
+                        <input type="password" name="potvrzeni_heslo" class="form-control" required>
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary">Uložit nové heslo</button>
+                        <a href="/muj-kalendar" class="btn btn-outline-secondary">Zpět do kalendáře</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
